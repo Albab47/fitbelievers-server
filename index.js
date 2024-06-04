@@ -16,6 +16,16 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
+// function to generate token
+const generateToken = (payload) => {
+  const secretKey = process.env.ACCESS_TOKEN_SECRET;
+  const options = {
+    expiresIn: "7d",
+  };
+  const token = jwt.sign(payload, secretKey, options);
+  return token;
+};
+
 // Create a MongoClient
 const client = new MongoClient(uri, {
   serverApi: {
@@ -27,9 +37,23 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    const db = client.db("fitBelievers")
-    const userCollection = db.collection('users');    
+    const db = client.db("fitBelievers");
+    const userCollection = db.collection("users");
 
+    /* ----------- Auth related apis ------------ */
+
+    // Generate token for user
+    app.post("/jwt", async (req, res) => {
+      const user = req.body;
+      const token = generateToken(user);
+      res.send({ token });
+    });
+
+    app.post("/users", async (req, res) => {
+      const user = req.body;
+      const result = await userCollection.insertOne(user);
+      res.send(result);
+    });
 
     // successful connection ping msg
     await client.db("admin").command({ ping: 1 });
@@ -41,8 +65,6 @@ async function run() {
   }
 }
 run().catch(console.dir);
-
-
 
 // Testing
 app.get("/", (req, res) => {
