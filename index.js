@@ -26,6 +26,27 @@ const generateToken = (payload) => {
   return token;
 };
 
+// function to verify token
+const verifyToken = (req, res, next) => {
+  const secretKey = process.env.ACCESS_TOKEN_SECRET;
+  const token = req.headers.authorization.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).send({ message: "unauthorized access" });
+  }
+
+  if (token) {
+    jwt.verify(token, secretKey, (err, decoded) => {
+      if (err) {
+        return res.status(401).send({ message: "unauthorized access" });
+      } else {
+        req.user = decoded;
+        next();
+      }
+    });
+  }
+};
+
 // Create a MongoClient
 const client = new MongoClient(uri, {
   serverApi: {
@@ -59,22 +80,11 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/users/:email", async (req, res) => {
+    app.get("/users/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
-      const user = await userCollection.findOne({email});
+      const user = await userCollection.findOne({ email });
       res.send(user);
     });
-
-
-
-
-
-
-
-
-
-
-
 
     // successful connection ping msg
     await client.db("admin").command({ ping: 1 });
