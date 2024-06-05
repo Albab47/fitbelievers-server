@@ -60,6 +60,7 @@ async function run() {
   try {
     const db = client.db("fitBelievers");
     const userCollection = db.collection("users");
+    const classCollection = db.collection("classes");
 
     /* ----------- Auth related apis ------------ */
 
@@ -84,6 +85,21 @@ async function run() {
       const email = req.params.email;
       const user = await userCollection.findOne({ email });
       res.send(user);
+    });
+
+    /* ----------- Service related api ------------ */
+
+    // Get top 6 most booked classes data from db
+    app.get("/top-classes", async (req, res) => {
+      const options = {
+        sort: { numberOfBookings: -1 },
+        projection: { name: 1, description: 1, image: 1, numberOfBookings: 1 },
+      };
+      const classes = await classCollection
+        .find({}, options)
+        .limit(6)
+        .toArray();
+      res.send(classes);
     });
 
     // successful connection ping msg
