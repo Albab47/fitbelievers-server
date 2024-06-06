@@ -61,6 +61,7 @@ async function run() {
     const db = client.db("fitBelievers");
     const userCollection = db.collection("users");
     const classCollection = db.collection("classes");
+    const trainerCollection = db.collection("trainers");
 
     /* ----------- Auth related apis ------------ */
 
@@ -102,10 +103,31 @@ async function run() {
       res.send(classes);
     });
 
+    // Get all books data from db
     app.get("/classes", async (req, res) => {
       const classes = await classCollection.find().toArray();
       res.send(classes);
     });
+
+    // Get trainers data from db (Team)
+    app.get("/trainers", async (req, res) => { 
+      const sort = req.query.sort;
+      const limit = parseInt(req.query.limit);
+      let options = {}
+           
+      if(sort === "team") {
+        options = {
+          projection: { name: 1, photo: 1, background: 1, specializations: 1 },
+        };
+      }
+      const teams = await trainerCollection
+        .find({}, options)
+        .limit(limit)
+        .toArray();
+      res.send(teams);
+    });
+    
+
 
     // successful connection ping msg
     await client.db("admin").command({ ping: 1 });
