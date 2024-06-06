@@ -103,10 +103,17 @@ async function run() {
       res.send(classes);
     });
 
-    // Get all books data from db
+    // Get all classes data from db
     app.get("/classes", async (req, res) => {
       const classes = await classCollection.find().toArray();
       res.send(classes);
+    });
+
+    // Get single class data from db
+    app.get("/classes/:id", async (req, res) => {
+      const query = {_id: new ObjectId(req.params.id)}
+      const classData = await classCollection.findOne(query);
+      res.send(classData);
     });
 
     // Get trainers data from db (Team)
@@ -114,7 +121,7 @@ async function run() {
       const sort = req.query.sort;
       const limit = parseInt(req.query.limit);
       let options = {}
-           
+
       if(sort === "team") {
         options = {
           projection: { name: 1, photo: 1, background: 1, specializations: 1 },
@@ -125,6 +132,13 @@ async function run() {
         .limit(limit)
         .toArray();
       res.send(teams);
+    });
+
+    // Get single trainer data from db
+    app.get("/trainers/:id", async (req, res) => {
+      const query = {_id: new ObjectId(req.params.id)}
+      const trainer = await classCollection.findOne(query);
+      res.send(trainer);
     });
     
 
