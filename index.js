@@ -65,6 +65,8 @@ async function run() {
     const trainerCollection = db.collection("trainers");
     const appliedTrainerCollection = db.collection("appliedTrainers");
     const slotCollection = db.collection("slots");
+    const subscriberCollection = db.collection("subscribers");
+    const reviewCollection = db.collection("reviews");
 
     /* ----------- Auth related apis ------------ */
 
@@ -95,7 +97,7 @@ async function run() {
     /* ----------- Service related api ------------ */
 
     // --------------- Classes Apis -------------------
-     
+
     // Get top 6 most booked classes data from db
     app.get("/top-classes", async (req, res) => {
       const options = {
@@ -117,7 +119,6 @@ async function run() {
       res.send(result);
     });
 
-
     // Get all classes data from db
     app.get("/classes", async (req, res) => {
       const classes = await classCollection.find().toArray();
@@ -126,7 +127,7 @@ async function run() {
 
     // Get single class data from db
     app.get("/classes/:id", async (req, res) => {
-      const query = {_id: new ObjectId(req.params.id)}
+      const query = { _id: new ObjectId(req.params.id) };
       const classData = await classCollection.findOne(query);
       res.send(classData);
     });
@@ -149,20 +150,20 @@ async function run() {
 
     // Remove applied trainer and change users status to trainer
     app.delete("/applied-trainers/:id", async (req, res) => {
-      const query = {_id: new ObjectId(req.params.id)}
+      const query = { _id: new ObjectId(req.params.id) };
       const result = await appliedTrainerCollection.deleteOne(query);
       res.send(result);
     });
 
-    // ---------------- Trainer Apis -------------------
+    // ----------------- Trainer Apis -------------------
 
-    // Get trainers data from db (Team)
-    app.get("/trainers", async (req, res) => { 
+    // Get trainers/team data from db
+    app.get("/trainers", async (req, res) => {
       const sort = req.query.sort;
       const limit = parseInt(req.query.limit);
-      let options = {}
+      let options = {};
 
-      if(sort === "team") {
+      if (sort === "team") {
         options = {
           projection: { name: 1, photo: 1, background: 1, specializations: 1 },
         };
@@ -176,20 +177,20 @@ async function run() {
 
     // Get single trainer data from db
     app.get("/trainers/:id", async (req, res) => {
-      const query = {_id: new ObjectId(req.params.id)}
+      const query = { _id: new ObjectId(req.params.id) };
       const trainer = await trainerCollection.findOne(query);
       res.send(trainer);
     });
-    
+
     // Delete a trainer
     app.delete("/trainers/:id", async (req, res) => {
-      const query = {_id: new ObjectId(req.params.id)}
+      const query = { _id: new ObjectId(req.params.id) };
       const result = await trainerCollection.deleteOne(query);
       res.send(result);
     });
 
     // --------------- Trainer slot Apis -------------------
- 
+
     // Save new slot data to db
     app.post("/slots", verifyToken, async (req, res) => {
       const slotData = req.body;
@@ -197,28 +198,43 @@ async function run() {
       const result = await slotCollection.insertOne(slotData);
       res.send(result);
     });
-    
+
     // Get slots data by email from db
-    app.get("/slots/:email", async (req, res) => { 
+    app.get("/slots/:email", async (req, res) => {
       const slots = await slotCollection.find().toArray();
       res.send(slots);
     });
 
     // Delete trainers data by email from db
-    app.delete("/slots/:id", async (req, res) => { 
-      const query = {_id: new ObjectId(req.params.id)}
+    app.delete("/slots/:id", async (req, res) => {
+      const query = { _id: new ObjectId(req.params.id) };
       const result = await slotCollection.deleteOne(query);
       res.send(result);
     });
 
+    // --------------- Newsletter & Reviews -----------------
 
+    // Save new Newsletter Subscriber
+    app.post("/newsletter-subscribers", async (req, res) => {
+      const userData = req.body;
+      console.log(userData);
+      const result = await subscriberCollection.insertOne(userData);
+      res.send(result);
+    });
 
+    // Get all subscribers data from db
+    app.get("/newsletter-subscribers", async (req, res) => {
+      const subscribers = await subscriberCollection.find().toArray();
+      res.send(subscribers);
+    });
 
-
-
-
-
-
+    // Save reviews to db
+    app.post("/reviews", async (req, res) => {
+      const reviewData = req.body;
+      console.log(reviewData);
+      const result = await reviewCollection.insertOne(reviewData);
+      res.send(result);
+    });
 
 
 
