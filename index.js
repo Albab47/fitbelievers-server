@@ -109,6 +109,15 @@ async function run() {
       res.send(classes);
     });
 
+    // Save new class data to db
+    app.post("/classes", verifyToken, async (req, res) => {
+      const classData = req.body;
+      console.log(classData);
+      const result = await appliedTrainerCollection.insertOne(classData);
+      res.send(result);
+    });
+
+
     // Get all classes data from db
     app.get("/classes", async (req, res) => {
       const classes = await classCollection.find().toArray();
