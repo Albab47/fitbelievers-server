@@ -64,6 +64,7 @@ async function run() {
     const classCollection = db.collection("classes");
     const trainerCollection = db.collection("trainers");
     const appliedTrainerCollection = db.collection("appliedTrainers");
+    const slotCollection = db.collection("slots");
 
     /* ----------- Auth related apis ------------ */
 
@@ -74,6 +75,7 @@ async function run() {
       res.send({ token });
     });
 
+    // ------------- User related api ---------------
     app.post("/users", async (req, res) => {
       const user = req.body;
       const existedUser = await userCollection.findOne({ email: user.email });
@@ -92,6 +94,8 @@ async function run() {
 
     /* ----------- Service related api ------------ */
 
+    // --------------- Classes Apis -------------------
+     
     // Get top 6 most booked classes data from db
     app.get("/top-classes", async (req, res) => {
       const options = {
@@ -118,13 +122,30 @@ async function run() {
       res.send(classData);
     });
 
-    // Add applied trainer data to db
+    // ------------- Applied Trainer Apis -------------------
+
+    // Save applied trainer data to db
     app.post("/applied-trainers", verifyToken, async (req, res) => {
       const trainerData = req.body;
       console.log(trainerData);
       const result = await appliedTrainerCollection.insertOne(trainerData);
       res.send(result);
     });
+
+    // Get applied trainers data from db
+    app.get("/applied-trainers", async (req, res) => {
+      const trainers = await appliedTrainerCollection.find().toArray();
+      res.send(trainers);
+    });
+
+    // Remove applied trainer and change users status to trainer
+    app.delete("/applied-trainers/:id", async (req, res) => {
+      const query = {_id: new ObjectId(req.params.id)}
+      const result = await appliedTrainerCollection.deleteOne(query);
+      res.send(result);
+    });
+
+    // ---------------- Trainer Apis -------------------
 
     // Get trainers data from db (Team)
     app.get("/trainers", async (req, res) => { 
@@ -151,6 +172,20 @@ async function run() {
       res.send(trainer);
     });
     
+    
+
+    
+    
+
+
+
+
+
+
+
+
+
+
 
 
     // successful connection ping msg
