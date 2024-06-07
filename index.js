@@ -189,10 +189,17 @@ async function run() {
       res.send(result);
     });
     
-    // Get trainers data by email from db
+    // Get slots data by email from db
     app.get("/slots/:email", async (req, res) => { 
       const slots = await slotCollection.find().toArray();
       res.send(slots);
+    });
+
+    // Delete trainers data by email from db
+    app.delete("/slots/:id", async (req, res) => { 
+      const query = {_id: new ObjectId(req.params.id)}
+      const result = await slotCollection.deleteOne(query);
+      res.send(result);
     });
 
 
