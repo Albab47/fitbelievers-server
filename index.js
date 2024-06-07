@@ -58,10 +58,12 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
+    // Collections
     const db = client.db("fitBelievers");
     const userCollection = db.collection("users");
     const classCollection = db.collection("classes");
     const trainerCollection = db.collection("trainers");
+    const appliedTrainerCollection = db.collection("appliedTrainers");
 
     /* ----------- Auth related apis ------------ */
 
@@ -116,6 +118,14 @@ async function run() {
       res.send(classData);
     });
 
+    // Add applied trainer data to db
+    app.post("/applied-trainers", verifyToken, async (req, res) => {
+      const trainerData = req.body;
+      console.log(trainerData);
+      const result = await appliedTrainerCollection.insertOne(trainerData);
+      res.send(result);
+    });
+
     // Get trainers data from db (Team)
     app.get("/trainers", async (req, res) => { 
       const sort = req.query.sort;
@@ -137,7 +147,7 @@ async function run() {
     // Get single trainer data from db
     app.get("/trainers/:id", async (req, res) => {
       const query = {_id: new ObjectId(req.params.id)}
-      const trainer = await classCollection.findOne(query);
+      const trainer = await trainerCollection.findOne(query);
       res.send(trainer);
     });
     
