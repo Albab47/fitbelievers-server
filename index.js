@@ -172,7 +172,12 @@ async function run() {
       res.send(trainer);
     });
     
-    
+    // Delete a trainer
+    app.delete("/trainers/:id", async (req, res) => {
+      const query = {_id: new ObjectId(req.params.id)}
+      const result = await trainerCollection.deleteOne(query);
+      res.send(result);
+    });
 
     
     
