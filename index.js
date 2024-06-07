@@ -179,8 +179,21 @@ async function run() {
       res.send(result);
     });
 
+    // --------------- Trainer slot Apis -------------------
+ 
+    // Save new slot data to db
+    app.post("/slots", verifyToken, async (req, res) => {
+      const slotData = req.body;
+      console.log(slotData);
+      const result = await slotCollection.insertOne(slotData);
+      res.send(result);
+    });
     
-    
+    // Get trainers data by email from db
+    app.get("/slots/:email", async (req, res) => { 
+      const slots = await slotCollection.find().toArray();
+      res.send(slots);
+    });
 
 
 
