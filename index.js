@@ -67,8 +67,29 @@ async function run() {
     const slotCollection = db.collection("slots");
     const subscriberCollection = db.collection("subscribers");
     const reviewCollection = db.collection("reviews");
+    const blogCollection = db.collection("blogs");
 
-    /* ----------- Auth related apis ------------ */
+    // Middlewares
+    const verifyAdmin = async(req, res, next) => {
+      const email = req.user.email;
+      const user = await userCollection.findOne({ email });
+      if(user.role !== "admin") {
+        return res.status(403).send({message: 'forbidden access'});
+      }
+      next()
+    }
+
+    const verifyTrainer = async(req, res, next) => {
+      const email = req.user.email;
+      console.log(email);
+      const user = await userCollection.findOne({ email });
+      if(user?.role !== "trainer") {
+        return res.status(404).send({message: 'forbidden access'});
+      }
+      next()
+    }
+
+    /* --------------- Auth related apis -------------- */
 
     // Generate token for user
     app.post("/jwt", async (req, res) => {
@@ -94,7 +115,7 @@ async function run() {
       res.send(user);
     });
 
-    /* ----------- Service related api ------------ */
+    /* --------------  Service related api ------------ */
 
     // --------------- Classes Apis -------------------
 
@@ -143,9 +164,16 @@ async function run() {
     });
 
     // Get applied trainers data from db
-    app.get("/applied-trainers", async (req, res) => {
+    app.get("/applied-trainers", verifyToken, verifyAdmin, async (req, res) => {
       const trainers = await appliedTrainerCollection.find().toArray();
       res.send(trainers);
+    });
+
+    // Get single applied trainers data from db
+    app.get("/applied-trainers/:id", verifyToken, verifyAdmin, async (req, res) => {
+      const query = { _id: new ObjectId(req.params.id) };
+      const applicant = await appliedTrainerCollection.findOne(query);
+      res.send(applicant);
     });
 
     // Remove applied trainer and change users status to trainer
@@ -205,19 +233,33 @@ async function run() {
       res.send(slots);
     });
 
-    // Delete trainers data by email from db
+    // Delete slot data by email from db
     app.delete("/slots/:id", async (req, res) => {
       const query = { _id: new ObjectId(req.params.id) };
       const result = await slotCollection.deleteOne(query);
       res.send(result);
     });
 
+    // --------------- Community posts -----------------
+
+    // Save blog posts data to db
+    app.post("/blogs", async (req, res) => {
+      const blogData = req.body;
+      const result = await blogCollection.insertOne(blogData);
+      res.send(result);
+    });
+
+    // Get all blogs data from db
+    app.get("/blogs", async (req, res) => {
+      const blogs = await blogCollection.find().toArray();
+      res.send(blogs);
+    });
+    
     // --------------- Newsletter & Reviews -----------------
 
     // Save new Newsletter Subscriber
     app.post("/newsletter-subscribers", async (req, res) => {
       const userData = req.body;
-      console.log(userData);
       const result = await subscriberCollection.insertOne(userData);
       res.send(result);
     });
@@ -229,12 +271,21 @@ async function run() {
     });
 
     // Save reviews to db
-    app.post("/reviews", async (req, res) => {
+    app.post("/reviews", async (req, res) => { 
       const reviewData = req.body;
       console.log(reviewData);
       const result = await reviewCollection.insertOne(reviewData);
       res.send(result);
     });
+
+    // Get all subscribers data from db
+    app.get("/reviews", async (req, res) => {
+      const reviews = await subscriberCollection.find().toArray();
+      res.send(reviews);
+    });
+
+
+
 
 
 
