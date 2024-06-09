@@ -142,7 +142,13 @@ async function run() {
 
     // Get all classes data from db
     app.get("/classes", async (req, res) => {
-      const classes = await classCollection.find().toArray();
+      let options = {};
+      if(req.query.optionData) {
+        options = {
+          projection: {_id:0, name: 1},
+        }
+      }
+      const classes = await classCollection.find({}, options).toArray();
       res.send(classes);
     });
 
@@ -210,6 +216,36 @@ async function run() {
       res.send(trainer);
     });
 
+    // Get single trainer data by email from db
+    app.get("/trainer/:email", async (req, res) => {
+      const query = { email: req.params.email };
+      const trainer = await trainerCollection.findOne(query);
+      res.send(trainer);
+    });
+
+    // remove trainer from applicant and save to trainer data
+    app.post("/trainers", verifyToken, verifyAdmin, async (req, res) => {
+      const trainerData = req.body;
+      const email = trainerData.email;
+
+      // Change status from member to trainer
+      const updateDoc = {
+        $set: {role: 'trainer'}
+      }
+      const userResult = await userCollection.updateOne({ email }, updateDoc);
+      if(userResult.modifiedCount === 0) return;
+      console.log(userResult);
+      
+      // Delete trainer from applied trainer collection
+      const deleteResult = await appliedTrainerCollection.deleteOne({email});
+      console.log(deleteResult);
+      
+      if(deleteResult.deletedCount === 1) {
+        const result = await trainerCollection.insertOne(trainerData);
+        res.send(result);
+      }
+    });
+
     // Delete a trainer
     app.delete("/trainers/:id", async (req, res) => {
       const query = { _id: new ObjectId(req.params.id) };
@@ -220,10 +256,27 @@ async function run() {
     // --------------- Trainer slot Apis -------------------
 
     // Save new slot data to db
-    app.post("/slots", verifyToken, async (req, res) => {
+    app.post("/slots", verifyToken, verifyTrainer, async (req, res) => {
       const slotData = req.body;
+      const classes = req.body.classesIncludes;
       console.log(slotData);
+
+      // update any class that name matches with classes
+      const filter = {name: { $in: [...classes] } };
+      // Add trainer data to each class they offer
+      const updateDoc = {
+        $push: {
+          trainers: {
+            name: slotData.trainer?.name,
+            email: slotData.trainer?.email,
+            photo: slotData.trainer?.photo,
+          }
+        }
+      }
+      const updateResult = await classCollection.updateMany(filter, updateDoc);
+      console.log(updateResult);
       const result = await slotCollection.insertOne(slotData);
+      console.log(result);
       res.send(result);
     });
 
