@@ -70,24 +70,24 @@ async function run() {
     const blogCollection = db.collection("blogs");
 
     // Middlewares
-    const verifyAdmin = async(req, res, next) => {
+    const verifyAdmin = async (req, res, next) => {
       const email = req.user.email;
       const user = await userCollection.findOne({ email });
-      if(user.role !== "admin") {
-        return res.status(403).send({message: 'forbidden access'});
+      if (user.role !== "admin") {
+        return res.status(403).send({ message: "forbidden access" });
       }
-      next()
-    }
+      next();
+    };
 
-    const verifyTrainer = async(req, res, next) => {
+    const verifyTrainer = async (req, res, next) => {
       const email = req.user.email;
       console.log(email);
       const user = await userCollection.findOne({ email });
-      if(user?.role !== "trainer") {
-        return res.status(404).send({message: 'forbidden access'});
+      if (user?.role !== "trainer") {
+        return res.status(404).send({ message: "forbidden access" });
       }
-      next()
-    }
+      next();
+    };
 
     /* --------------- Auth related apis -------------- */
 
@@ -133,22 +133,29 @@ async function run() {
     });
 
     // Save new class data to db
-    app.post("/classes", verifyToken, async (req, res) => {
+    app.post("/classes", verifyToken, verifyAdmin, async (req, res) => {
       const classData = req.body;
       console.log(classData);
-      const result = await appliedTrainerCollection.insertOne(classData);
+      const result = await classCollection.insertOne(classData);
       res.send(result);
     });
 
     // Get all classes data from db
     app.get("/classes", async (req, res) => {
+      const size = parseInt(req.query.size);
+      const page = parseInt(req.query.page) - 1;
       let options = {};
-      if(req.query.optionData) {
+      if (req.query.optionData) {
         options = {
-          projection: {_id:0, name: 1},
-        }
+          projection: { _id: 0, name: 1 },
+        };
       }
-      const classes = await classCollection.find({}, options).toArray();
+
+      const classes = await classCollection
+        .find({}, options)
+        .skip(page * size)
+        .limit(size)
+        .toArray();
       res.send(classes);
     });
 
@@ -157,6 +164,12 @@ async function run() {
       const query = { _id: new ObjectId(req.params.id) };
       const classData = await classCollection.findOne(query);
       res.send(classData);
+    });
+
+    // Get classes data count
+    app.get("/classes-count", async (req, res) => {
+      const count = await classCollection.estimatedDocumentCount();
+      res.send({ count });
     });
 
     // ------------- Applied Trainer Apis -------------------
@@ -176,11 +189,16 @@ async function run() {
     });
 
     // Get single applied trainers data from db
-    app.get("/applied-trainers/:id", verifyToken, verifyAdmin, async (req, res) => {
-      const query = { _id: new ObjectId(req.params.id) };
-      const applicant = await appliedTrainerCollection.findOne(query);
-      res.send(applicant);
-    });
+    app.get(
+      "/applied-trainers/:id",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const query = { _id: new ObjectId(req.params.id) };
+        const applicant = await appliedTrainerCollection.findOne(query);
+        res.send(applicant);
+      }
+    );
 
     // Remove applied trainer and change users status to trainer
     app.delete("/applied-trainers/:id", async (req, res) => {
@@ -230,17 +248,17 @@ async function run() {
 
       // Change status from member to trainer
       const updateDoc = {
-        $set: {role: 'trainer'}
-      }
+        $set: { role: "trainer" },
+      };
       const userResult = await userCollection.updateOne({ email }, updateDoc);
-      if(userResult.modifiedCount === 0) return;
+      if (userResult.modifiedCount === 0) return;
       console.log(userResult);
-      
+
       // Delete trainer from applied trainer collection
-      const deleteResult = await appliedTrainerCollection.deleteOne({email});
+      const deleteResult = await appliedTrainerCollection.deleteOne({ email });
       console.log(deleteResult);
-      
-      if(deleteResult.deletedCount === 1) {
+
+      if (deleteResult.deletedCount === 1) {
         const result = await trainerCollection.insertOne(trainerData);
         res.send(result);
       }
@@ -255,14 +273,15 @@ async function run() {
 
     // --------------- Trainer slot Apis -------------------
 
-    // Save new slot data to db
+    // Save new slot data to db and save trainer info to class
     app.post("/slots", verifyToken, verifyTrainer, async (req, res) => {
       const slotData = req.body;
       const classes = req.body.classesIncludes;
-      console.log(slotData);
+
+      // Check if trainer exist
 
       // update any class that name matches with classes
-      const filter = {name: { $in: [...classes] } };
+      const filter = { name: { $in: [...classes] } };
       // Add trainer data to each class they offer
       const updateDoc = {
         $push: {
@@ -270,13 +289,11 @@ async function run() {
             name: slotData.trainer?.name,
             email: slotData.trainer?.email,
             photo: slotData.trainer?.photo,
-          }
-        }
-      }
+          },
+        },
+      };
       const updateResult = await classCollection.updateMany(filter, updateDoc);
-      console.log(updateResult);
       const result = await slotCollection.insertOne(slotData);
-      console.log(result);
       res.send(result);
     });
 
@@ -307,7 +324,7 @@ async function run() {
       const blogs = await blogCollection.find().toArray();
       res.send(blogs);
     });
-    
+
     // --------------- Newsletter & Reviews -----------------
 
     // Save new Newsletter Subscriber
@@ -324,7 +341,7 @@ async function run() {
     });
 
     // Save reviews to db
-    app.post("/reviews", async (req, res) => { 
+    app.post("/reviews", async (req, res) => {
       const reviewData = req.body;
       console.log(reviewData);
       const result = await reviewCollection.insertOne(reviewData);
@@ -336,11 +353,6 @@ async function run() {
       const reviews = await subscriberCollection.find().toArray();
       res.send(reviews);
     });
-
-
-
-
-
 
     // successful connection ping msg
     await client.db("admin").command({ ping: 1 });
