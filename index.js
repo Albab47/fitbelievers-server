@@ -267,7 +267,12 @@ async function run() {
     // Delete a trainer
     app.delete("/trainers/:id", async (req, res) => {
       const query = { _id: new ObjectId(req.params.id) };
+      const updateDoc = {
+        $set: { role: "member" },
+      };
+
       const result = await trainerCollection.deleteOne(query);
+      const userResult = await userCollection.updateOne(query, updateDoc);
       res.send(result);
     });
 
@@ -276,9 +281,8 @@ async function run() {
     // Save new slot data to db and save trainer info to class
     app.post("/slots", verifyToken, verifyTrainer, async (req, res) => {
       const slotData = req.body;
+      const trainerId = slotData.trainer.id;
       const classes = req.body.classesIncludes;
-
-      // Check if trainer exist
 
       // update any class that name matches with classes
       const filter = { name: { $in: [...classes] } };
@@ -289,21 +293,41 @@ async function run() {
             name: slotData.trainer?.name,
             email: slotData.trainer?.email,
             photo: slotData.trainer?.photo,
+            id: slotData.trainer?.id,
           },
         },
       };
       const updateResult = await classCollection.updateMany(filter, updateDoc);
       const result = await slotCollection.insertOne(slotData);
+      
+      const trainerFilter = { _id: new ObjectId(trainerId) };
+      const updateTrainerDoc = {
+        $push: {
+          availableSlots: {
+            slotId: result.insertedId,
+            slotName: slotData.slotName,
+            slotDays: slotData.slotDays,
+            slotTime: slotData.slotTime,
+            classesIncludes: slotData.classesIncludes,
+          },
+        },
+      };
+      const trainerResult = await trainerCollection.updateOne(
+        trainerFilter,
+        updateTrainerDoc
+      );
       res.send(result);
     });
 
     // Get slots data by email from db
     app.get("/slots/:email", async (req, res) => {
-      const slots = await slotCollection.find().toArray();
+      const email = req.params.email;
+      const query = {'trainer.email': email}
+      const slots = await slotCollection.find(query).toArray();
       res.send(slots);
     });
 
-    // Delete slot data by email from db
+    // Delete slot data
     app.delete("/slots/:id", async (req, res) => {
       const query = { _id: new ObjectId(req.params.id) };
       const result = await slotCollection.deleteOne(query);
@@ -328,14 +352,14 @@ async function run() {
     // --------------- Newsletter & Reviews -----------------
 
     // Save new Newsletter Subscriber
-    app.post("/newsletter-subscribers", async (req, res) => {
-      const userData = req.body;
-      const result = await subscriberCollection.insertOne(userData);
+    app.post("/newsletter", async (req, res) => {
+      const subscriberData = req.body;
+      const result = await subscriberCollection.insertOne(subscriberData);
       res.send(result);
     });
 
     // Get all subscribers data from db
-    app.get("/newsletter-subscribers", async (req, res) => {
+    app.get("/subscribers", async (req, res) => {
       const subscribers = await subscriberCollection.find().toArray();
       res.send(subscribers);
     });
