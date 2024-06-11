@@ -434,6 +434,20 @@ async function run() {
       res.send(bookings);
     });
 
+    app.get("/booked-trainers/:email", async (req, res) => {
+      const {email} = req.params;
+      const options = {
+        projection: {_id: 0, trainerId: 1}
+      }
+      const trainers = await bookingCollection.find({email}, options).toArray();
+      const trainerIds = trainers.map(t => new ObjectId(t.trainerId))
+
+      const query = {_id: {$in: [...trainerIds] } }
+
+      const result = await trainerCollection.find(query).toArray();
+      res.send(result)
+    });
+
     // --------------- Community posts -----------------
 
     // Save blog posts data to db
@@ -448,6 +462,7 @@ async function run() {
       const blogs = await blogCollection.find().toArray();
       res.send(blogs);
     });
+
 
     // --------------- Newsletter & Reviews -----------------
 
