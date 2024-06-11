@@ -3,6 +3,7 @@ const express = require("express");
 const jwt = require("jsonwebtoken");
 const cors = require("cors");
 require("dotenv").config();
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.173efa4.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 const port = process.env.PORT || 5000;
@@ -68,6 +69,8 @@ async function run() {
     const subscriberCollection = db.collection("subscribers");
     const reviewCollection = db.collection("reviews");
     const blogCollection = db.collection("blogs");
+    const cartCollection = db.collection("carts");
+    const bookingCollection = db.collection("bookings");
 
     // Middlewares
     const verifyAdmin = async (req, res, next) => {
@@ -96,6 +99,29 @@ async function run() {
       const user = req.body;
       const token = generateToken(user);
       res.send({ token });
+    });
+
+    // Create Payment Intent
+    app.post("/create-payment-intent", async (req, res) => {
+      const price = req.body.price;
+      const priceInCent = parseFloat(price) * 100;
+
+      if (!price || priceInCent < 1) {
+        return;
+      }
+
+      // Create a PaymentIntent with the order amount and currency
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: priceInCent,
+        currency: "usd",
+        automatic_payment_methods: {
+          enabled: true,
+        },
+      });
+
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      });
     });
 
     // ------------- User related api ---------------
@@ -299,7 +325,7 @@ async function run() {
       };
       const updateResult = await classCollection.updateMany(filter, updateDoc);
       const result = await slotCollection.insertOne(slotData);
-      
+
       const trainerFilter = { _id: new ObjectId(trainerId) };
       const updateTrainerDoc = {
         $push: {
@@ -319,19 +345,93 @@ async function run() {
       res.send(result);
     });
 
+    // Get data by id from db
+    app.get("/slot/:id", async (req, res) => {
+      const query = { _id: new ObjectId(req.params.id) };
+      const slot = await slotCollection.findOne(query);
+      res.send(slot);
+    });
+
     // Get slots data by email from db
     app.get("/slots/:email", async (req, res) => {
       const email = req.params.email;
-      const query = {'trainer.email': email}
+      const query = { "trainer.email": email };
       const slots = await slotCollection.find(query).toArray();
       res.send(slots);
     });
 
     // Delete slot data
-    app.delete("/slots/:id", async (req, res) => {
-      const query = { _id: new ObjectId(req.params.id) };
+    app.delete("/slots/:id", verifyToken, verifyTrainer, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
       const result = await slotCollection.deleteOne(query);
+      // Delete trainer available slot by id
+      const trainerQuery = {
+        availableSlots: { $elemMatch: { slotId: new ObjectId(id) } },
+      };
+      const updateDoc = {
+        $pull: { availableSlots: { slotId: new ObjectId(id) } },
+      };
+      const trainerResult = await trainerCollection.updateOne(
+        trainerQuery,
+        updateDoc
+      );
+      res.send(trainerResult);
+    });
+
+    // --------------- Booking and payments -----------------
+    app.put("/carts", async (req, res) => {
+      const cartData = req.body;
+      const {slotId} = cartData;
+      console.log(cartData);
+
+      const updateDoc = {
+        $set: {...cartData}
+      }
+      const options = {upsert: true}
+      const result = await cartCollection.updateOne({slotId}, updateDoc, options);
       res.send(result);
+    });
+
+    app.get("/carts/:email", async (req, res) => {
+      const email = req.params.email;
+      const cart = await cartCollection.findOne({email});
+      res.send(cart);
+    });
+
+    // Save booking data, push buyer to bookedBy array and delete cart data by slotId
+    app.post("/bookings", async (req, res) => {
+      const bookingData = req.body;
+      const {slotId} = bookingData;
+      console.log(bookingData);
+
+      // Save booking
+      const bookingResult = await bookingCollection.insertOne(bookingData);
+      console.log(bookingResult);
+
+      // Update slot data's bookedBy array
+      const query = {_id: new ObjectId(slotId)}
+      const updateDoc = {
+        $push: {
+          bookedBy: {
+            name: bookingData?.name,
+            email: bookingData?.email,
+          },
+        },
+      };
+      const slotResult = await slotCollection.updateOne(query, updateDoc);
+      console.log(slotResult);
+
+      // Delete cart data
+      const deleteResult = await cartCollection.deleteOne({slotId});
+      console.log(deleteResult);
+
+      res.send(bookingResult);
+    });
+
+    app.get("/bookings", async (req, res) => {
+      const bookings = await bookingCollection.find().toArray();
+      res.send(bookings);
     });
 
     // --------------- Community posts -----------------
