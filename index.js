@@ -382,27 +382,31 @@ async function run() {
     // --------------- Booking and payments -----------------
     app.put("/carts", async (req, res) => {
       const cartData = req.body;
-      const {slotId} = cartData;
+      const { slotId } = cartData;
       console.log(cartData);
 
       const updateDoc = {
-        $set: {...cartData}
-      }
-      const options = {upsert: true}
-      const result = await cartCollection.updateOne({slotId}, updateDoc, options);
+        $set: { ...cartData },
+      };
+      const options = { upsert: true };
+      const result = await cartCollection.updateOne(
+        { slotId },
+        updateDoc,
+        options
+      );
       res.send(result);
     });
 
     app.get("/carts/:email", async (req, res) => {
       const email = req.params.email;
-      const cart = await cartCollection.findOne({email});
+      const cart = await cartCollection.findOne({ email });
       res.send(cart);
     });
 
     // Save booking data, push buyer to bookedBy array and delete cart data by slotId
     app.post("/bookings", async (req, res) => {
       const bookingData = req.body;
-      const {slotId} = bookingData;
+      const { slotId, classes } = bookingData;
       console.log(bookingData);
 
       // Save booking
@@ -410,7 +414,7 @@ async function run() {
       console.log(bookingResult);
 
       // Update slot data's bookedBy array
-      const query = {_id: new ObjectId(slotId)}
+      const query = { _id: new ObjectId(slotId) };
       const updateDoc = {
         $push: {
           bookedBy: {
@@ -423,8 +427,18 @@ async function run() {
       console.log(slotResult);
 
       // Delete cart data
-      const deleteResult = await cartCollection.deleteOne({slotId});
+      const deleteResult = await cartCollection.deleteOne({ slotId });
       console.log(deleteResult);
+
+      // Increase number of booking
+      const filter = { name: { $in: [...classes] } };
+      const updateClassDoc = {
+        $inc: { numberOfBookings: 1 },
+      };
+      const classesResult = await classCollection.updateMany(
+        filter,
+        updateClassDoc
+      );
 
       res.send(bookingResult);
     });
@@ -435,17 +449,19 @@ async function run() {
     });
 
     app.get("/booked-trainers/:email", async (req, res) => {
-      const {email} = req.params;
+      const { email } = req.params;
       const options = {
-        projection: {_id: 0, trainerId: 1}
-      }
-      const trainers = await bookingCollection.find({email}, options).toArray();
-      const trainerIds = trainers.map(t => new ObjectId(t.trainerId))
+        projection: { _id: 0, trainerId: 1 },
+      };
+      const trainers = await bookingCollection
+        .find({ email }, options)
+        .toArray();
+      const trainerIds = trainers.map((t) => new ObjectId(t.trainerId));
 
-      const query = {_id: {$in: [...trainerIds] } }
+      const query = { _id: { $in: [...trainerIds] } };
 
       const result = await trainerCollection.find(query).toArray();
-      res.send(result)
+      res.send(result);
     });
 
     // --------------- Community posts -----------------
@@ -462,7 +478,6 @@ async function run() {
       const blogs = await blogCollection.find().toArray();
       res.send(blogs);
     });
-
 
     // --------------- Newsletter & Reviews -----------------
 
