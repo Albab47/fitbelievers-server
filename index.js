@@ -34,7 +34,7 @@ const generateToken = (payload) => {
 // function to verify token
 const verifyToken = (req, res, next) => {
   const secretKey = process.env.ACCESS_TOKEN_SECRET;
-  const token = req.headers.authorization.split(" ")[1];
+  const token = req.headers.authorization?.split(" ")[1];
 
   if (!token) {
     return res.status(401).send({ message: "unauthorized access" });
@@ -147,6 +147,7 @@ async function run() {
       res.send(user);
     });
 
+    // Update user data
     app.patch("/users/:email", verifyToken, verifyAdmin, async (req, res) => {
       const updateData = req.body;
       console.log(updateData);
@@ -159,6 +160,13 @@ async function run() {
       };
       const result = await userCollection.updateOne(query, updateDoc);
       res.send(result);
+    });
+
+    // Get all pending and rejected status user
+    app.get("/users", async (req, res) => {
+      const query = {status: {$in: ['pending', "rejected"]} }     
+      const user = await userCollection.find(query).toArray();
+      res.send(user);
     });
 
     /* --------------  Service related api ------------ */
