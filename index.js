@@ -129,6 +129,7 @@ async function run() {
     });
 
     // ------------- User related api ---------------
+    // Save user
     app.post("/users", async (req, res) => {
       const user = req.body;
       const existedUser = await userCollection.findOne({ email: user.email });
@@ -139,10 +140,25 @@ async function run() {
       res.send(result);
     });
 
+    // Get user data
     app.get("/users/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
       const user = await userCollection.findOne({ email });
       res.send(user);
+    });
+
+    app.patch("/users/:email", verifyToken, verifyAdmin, async (req, res) => {
+      const updateData = req.body;
+      console.log(updateData);
+
+      const query = { email: req.params.email };
+      const updateDoc = {
+        $set: {
+          ...updateData,
+        },
+      };
+      const result = await userCollection.updateOne(query, updateDoc);
+      res.send(result);
     });
 
     /* --------------  Service related api ------------ */
@@ -238,7 +254,29 @@ async function run() {
       }
     );
 
-    
+    // Remove applied trainer and change users status to trainer
+    app.delete(
+      "/applied-trainers/:id",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const { feedback, email } = req.body;
+        const query = { _id: new ObjectId(req.params.id) };
+        const result = await appliedTrainerCollection.deleteOne(query);
+
+        const updateDoc = {
+          $set: {
+            status: "rejected",
+            feedback: feedback,
+          },
+        };
+        const statusResult = await userCollection.updateOne(
+          { email },
+          updateDoc
+        );
+        res.send(statusResult);
+      }
+    );
 
     // ----------------- Trainer Apis -------------------
 
