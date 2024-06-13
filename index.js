@@ -10,7 +10,11 @@ const port = process.env.PORT || 5000;
 const app = express();
 
 const corsOptions = {
-  origin: ["http://localhost:5173", "http://localhost:5174"],
+  origin: [
+    "http://localhost:5173",
+    "https://fitbelieversgym.web.app",
+    "https://fitbelieversgym.firebaseapp.com",
+  ],
 };
 
 // Middlewares
@@ -68,7 +72,7 @@ async function run() {
     const slotCollection = db.collection("slots");
     const subscriberCollection = db.collection("subscribers");
     const reviewCollection = db.collection("reviews");
-    const blogCollection = db.collection("blogs");
+    const postCollection = db.collection("posts");
     const cartCollection = db.collection("carts");
     const bookingCollection = db.collection("bookings");
 
@@ -203,7 +207,15 @@ async function run() {
     // Save applied trainer data to db
     app.post("/applied-trainers", verifyToken, async (req, res) => {
       const trainerData = req.body;
+      const { email } = trainerData;
       console.log(trainerData);
+      const updateDoc = {
+        $set: {
+          status: "pending",
+        },
+      };
+      const statusResult = await userCollection.updateOne({ email }, updateDoc);
+
       const result = await appliedTrainerCollection.insertOne(trainerData);
       res.send(result);
     });
@@ -226,12 +238,7 @@ async function run() {
       }
     );
 
-    // Remove applied trainer and change users status to trainer
-    app.delete("/applied-trainers/:id", async (req, res) => {
-      const query = { _id: new ObjectId(req.params.id) };
-      const result = await appliedTrainerCollection.deleteOne(query);
-      res.send(result);
-    });
+    
 
     // ----------------- Trainer Apis -------------------
 
@@ -451,7 +458,7 @@ async function run() {
     app.get("/booked-trainers/:email", async (req, res) => {
       const { email } = req.params;
       const options = {
-        projection: { _id: 0, trainerId: 1 },
+        projection: { _id: 0, trainerId: 1, classes: 1 },
       };
       const trainers = await bookingCollection
         .find({ email }, options)
@@ -467,16 +474,62 @@ async function run() {
     // --------------- Community posts -----------------
 
     // Save blog posts data to db
-    app.post("/blogs", async (req, res) => {
-      const blogData = req.body;
-      const result = await blogCollection.insertOne(blogData);
+    app.post("/posts", async (req, res) => {
+      const postData = req.body;
+      console.log(postData);
+      const result = await postCollection.insertOne(postData);
       res.send(result);
     });
 
-    // Get all blogs data from db
-    app.get("/blogs", async (req, res) => {
-      const blogs = await blogCollection.find().toArray();
-      res.send(blogs);
+    // Get all blog posts data from db
+    app.get("/posts", async (req, res) => {
+      const sort = req.query.sort;
+      let options = {};
+      if (sort === "recentPost") {
+        options = {
+          sort: { timestamp: -1 },
+        };
+      }
+
+      const size = parseInt(req.query.size);
+      const page = parseInt(req.query.page) - 1;
+
+      const posts = await postCollection
+        .find({}, options)
+        .skip(page * size)
+        .limit(size)
+        .toArray();
+      res.send(posts);
+    });
+
+    // Update single post data field from db
+    app.patch("/posts/upvote/:id", verifyToken, async (req, res) => {
+      const { upvote } = req.body;
+      console.log(upvote);
+      const query = { _id: new ObjectId(req.params.id) };
+      const updateDoc = {
+        $inc: { upvote: upvote },
+      };
+      const result = await postCollection.updateOne(query, updateDoc);
+      res.send(result);
+    });
+
+    // Update single post data field from db
+    app.patch("/posts/downvote/:id", verifyToken, async (req, res) => {
+      const { downvote } = req.body;
+      console.log(downvote);
+      const query = { _id: new ObjectId(req.params.id) };
+      const updateDoc = {
+        $inc: { downvote: downvote },
+      };
+      const result = await postCollection.updateOne(query, updateDoc);
+      res.send(result);
+    });
+
+    // Get posts data count
+    app.get("/posts-count", async (req, res) => {
+      const count = await postCollection.estimatedDocumentCount();
+      res.send({ count });
     });
 
     // --------------- Newsletter & Reviews -----------------
@@ -504,12 +557,47 @@ async function run() {
 
     // Get all subscribers data from db
     app.get("/reviews", async (req, res) => {
-      const reviews = await subscriberCollection.find().toArray();
+      const reviews = await reviewCollection.find().toArray();
       res.send(reviews);
     });
 
+    // Get Admin Stats data from db
+    app.get("/admin-stats", async (req, res) => {
+      // total payment
+      const options = { projection: { _id: 0, price: 1 } };
+      const payments = await bookingCollection.find({}, options).toArray();
+      const totalBalance = payments.reduce((acc, item) => acc + item.price, 0);
+
+      // last six transactions
+      const bookingOptions = {
+        sort: { date: -1 },
+      };
+      const bookings = await bookingCollection
+        .find({}, bookingOptions)
+        .limit(6)
+        .toArray();
+
+      // make data with total newsletter sub and paid members
+      const subscribers = await subscriberCollection.estimatedDocumentCount();
+      const paidMembers = await bookingCollection.estimatedDocumentCount();
+      const totalTrainers = await trainerCollection.estimatedDocumentCount();
+      const totalClasses = await classCollection.estimatedDocumentCount();
+
+      const statsData = {
+        totalBalance,
+        lastBookings: bookings,
+        totalTrainers,
+        totalClasses,
+        chartData: [
+          { name: "Newsletter Subscribers", value: subscribers },
+          { name: "Paid Members", value: paidMembers },
+        ],
+      };
+      res.send(statsData);
+    });
+
     // successful connection ping msg
-    await client.db("admin").command({ ping: 1 });
+    // await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
