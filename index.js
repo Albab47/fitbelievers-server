@@ -198,6 +198,14 @@ async function run() {
     app.get("/classes", async (req, res) => {
       const size = parseInt(req.query.size);
       const page = parseInt(req.query.page) - 1;
+      const search = req.query.search;
+      console.log(search);
+
+      let query = {}
+      if(search) {
+        query = {name: {$regex: search, $options: "i" } }
+      }
+
       let options = {};
       if (req.query.optionData) {
         options = {
@@ -205,12 +213,15 @@ async function run() {
         };
       }
 
+      const count = await classCollection.countDocuments(query);
+      console.log(count);
+
       const classes = await classCollection
-        .find({}, options)
+        .find(query, options)
         .skip(page * size)
         .limit(size)
         .toArray();
-      res.send(classes);
+      res.send({classes, count});
     });
 
     // Get single class data from db
