@@ -307,7 +307,7 @@ async function run() {
 
       if (sort === "team") {
         options = {
-          projection: { name: 1, photo: 1, background: 1, specializations: 1 },
+          projection: { name: 1, photo: 1, background: 1, expertise: 1 },
         };
       }
       const teams = await trainerCollection
