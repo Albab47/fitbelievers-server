@@ -163,7 +163,7 @@ async function run() {
     });
 
     // Get all pending and rejected status user
-    app.get("/users", async (req, res) => {
+    app.get("/users", verifyToken, async (req, res) => {
       const query = {status: {$in: ['pending', "rejected"]} }     
       const user = await userCollection.find(query).toArray();
       res.send(user);
@@ -355,7 +355,7 @@ async function run() {
     });
 
     // Delete a trainer
-    app.delete("/trainers/:id", async (req, res) => {
+    app.delete("/trainers/:id", verifyToken, verifyAdmin, async (req, res) => {
       const query = { _id: new ObjectId(req.params.id) };
       const updateDoc = {
         $set: { role: "member" },
@@ -417,7 +417,7 @@ async function run() {
     });
 
     // Get slots data by email from db
-    app.get("/slots/:email", async (req, res) => {
+    app.get("/slots/:email", verifyToken, verifyTrainer, async (req, res) => {
       const email = req.params.email;
       const query = { "trainer.email": email };
       const slots = await slotCollection.find(query).toArray();
@@ -468,7 +468,7 @@ async function run() {
     });
 
     // Save booking data, push buyer to bookedBy array and delete cart data by slotId
-    app.post("/bookings", async (req, res) => {
+    app.post("/bookings", verifyToken, async (req, res) => {
       const bookingData = req.body;
       const { slotId, classes } = bookingData;
       console.log(bookingData);
@@ -531,7 +531,7 @@ async function run() {
     // --------------- Community posts -----------------
 
     // Save blog posts data to db
-    app.post("/posts", async (req, res) => {
+    app.post("/posts", verifyToken, async (req, res) => {
       const postData = req.body;
       console.log(postData);
       const result = await postCollection.insertOne(postData);
@@ -599,27 +599,27 @@ async function run() {
     });
 
     // Get all subscribers data from db
-    app.get("/subscribers", async (req, res) => {
+    app.get("/subscribers", verifyToken, verifyAdmin, async (req, res) => {
       const subscribers = await subscriberCollection.find().toArray();
       res.send(subscribers);
     });
 
     // Save reviews to db
-    app.post("/reviews", async (req, res) => {
+    app.post("/reviews", verifyToken, async (req, res) => {
       const reviewData = req.body;
       console.log(reviewData);
       const result = await reviewCollection.insertOne(reviewData);
       res.send(result);
     });
 
-    // Get all subscribers data from db
+    // Get all reviews data from db
     app.get("/reviews", async (req, res) => {
       const reviews = await reviewCollection.find().toArray();
       res.send(reviews);
     });
 
     // Get Admin Stats data from db
-    app.get("/admin-stats", async (req, res) => {
+    app.get("/admin-stats", verifyToken, verifyAdmin, async (req, res) => {
       // total payment
       const options = { projection: { _id: 0, price: 1 } };
       const payments = await bookingCollection.find({}, options).toArray();
